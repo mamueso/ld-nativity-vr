@@ -35,12 +35,12 @@ class GamepadControls extends THREE.EventDispatcher {
 		if (!gamepadSupportAvailable) {
 			console.log( 'Gamepads NOT SUPPORTED' );
 		} else {
-			if ('ongamepadconnected' in window) {
-				window.addEventListener('gamepadconnected', onGamepadConnect.bind( this ), false);
-				window.addEventListener('gamepaddisconnected', gamepadSupport.onGamepadDisconnect.bind( this ), false);
-			} else {
+			//if ('ongamepadconnected' in window) {
+				//window.addEventListener('gamepadconnected', onGamepadConnect.bind( this ), false);
+				//window.addEventListener('gamepaddisconnected', gamepadSupport.onGamepadDisconnect.bind( this ), false);
+			//} else {
 				this.startPolling();
-			}
+			//}
 		}
 	}
 

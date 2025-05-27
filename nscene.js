@@ -120,11 +120,15 @@ let container;
 let hand1, hand2;
 let controller1, controller2;
 let controllerGrip1, controllerGrip2;
+let animationLoopStarted = false
+let session;
+
+
 
 function initControlsXR() {
 
    renderer.xr.enabled = true;
-
+	
    container = document.createElement( 'div' );
    document.body.appendChild( container );
 
@@ -199,8 +203,10 @@ function applyInitialSettings() {
     updateShadows(gfxSettings.shadows);
     setMasterVolume();
     setGamepadEnabled();
-    gpControls.moveSensitivity = gamepadSettings.moveSensitivity;
-    gpControls.lookSensitivity = gamepadSettings.lookSensitivity;
+    if(gpControls){
+        gpControls.moveSensitivity = gamepadSettings.moveSensitivity;
+	gpControls.lookSensitivity = gamepadSettings.lookSensitivity;
+    }
     setSeason(gameSettings.season);
 }
 
@@ -227,6 +233,7 @@ function initControls() {
     // initComposer();
 
     controls = new PointerLockControls( camera, document.body );
+    if(navigator.getGamepads){
     gpControls = new GamepadControls( controls );
 
     let gamePadButtonActions = [];
@@ -245,7 +252,7 @@ function initControls() {
                                          };
     gamePadButtonActions[16] = gamePadButtonActions[9];
     gpControls.buttonActions = gamePadButtonActions;
-
+    }
     scene.add( controls.getObject() );
 
     document.getElementById('infoLink').addEventListener('click', e => {
@@ -525,7 +532,15 @@ function pauseGame() {
 }
 
 function startGame() {
-    requestAnimationFrame(animate);
+
+	if(renderer.xr.isPresenting){
+		if (!animationLoopStarted) {
+		    renderer.setAnimationLoop(animate);
+		    animationLoopStarted = true;
+		} 
+	} else {
+		requestAnimationFrame(animate)
+	}
 
     updateBlocker(true);
 
@@ -1237,11 +1252,68 @@ function onDocumentClick( event ) {
     event.preventDefault();
 }
 
+
+
+
+function checkXRController(delta){
+	
+	let xAxis = 0 , yAxis = 0;
+
+	if(renderer.xr.isPresenting){
+		const   session = renderer.xr.getSession();
+		if(!session){ alert("No valid session"); }
+		const inputSources = session.inputSources;
+		if(!inputSources) {alert("no inputSources");} 
+ 		for (const source of inputSources) {
+			if (!source.gamepad){
+				alert("no gamepad");
+				continue;
+			}
+			const axes = source.gamepad.axes;
+			if (axes.length >= 2) {
+				xAxis = axes[0];
+				yAxis = axes[1];
+			} else {
+				alert("no axes!");
+			}
+		}
+
+  		const speed = 1000000.0; // Bewegungsgeschwindigkeit
+		delta = animClock.getDelta();
+
+		// Richtung relativ zur Kamera
+		const forward = new THREE.Vector3();
+		camera.getWorldDirection(forward);
+		forward.y = 0;
+		forward.normalize();
+
+		const right = new THREE.Vector3();
+		right.crossVectors(forward, camera.up).normalize();
+
+		// Bewegung anwenden
+		const move = new THREE.Vector3();
+		move.addScaledVector(forward, -yAxis * speed * delta);
+		move.addScaledVector(right, xAxis * speed * delta);
+
+		controlsXR.getObject().position.add(move);
+		// alert("xAxis = "+xAxis+" yAxis = "+aAxis);
+
+	}
+}
+
+
 function animate() {
 
     if ( gameActive ) {
 
-        requestAnimationFrame( animate );
+		if(renderer.xr.isPresenting){
+			if (!animationLoopStarted) {
+			    renderer.setAnimationLoop(animate);
+			    animationLoopStarted = true;
+			}
+		} else {
+			requestAnimationFrame(animate);
+		}
 
         let animDelta = animClock.getDelta();
         let walkDelta = walkClock.getDelta();
@@ -1260,14 +1332,15 @@ function animate() {
         mixer.update( animDelta );
 
         updateControls( walkDelta );
+		checkXRController( walkDelta );
+
 
         particleSystems = particleSystems.filter(function(ps) {
             ps.update(animDelta);
             return !ps.removeAndDisposeIfFinished();
         });
 
-        // render();
-	renderer.setAnimationLoop( render );
+        render();
 
     }
 }
@@ -1347,7 +1420,8 @@ function updateControls(delta) {
 
     if (angel) {
         angel.lookAt(controls.getObject().position);
-    }
+    }	
+	
 }
 
 function setNight(blend) {
@@ -1604,8 +1678,16 @@ function resizeBlockerRenderer() {
 }
 
 function animateBlocker(){
-    if (!gameActive) requestAnimationFrame(animateBlocker);
-
+    if (!gameActive){
+		if(renderer.xr.isPresenting){
+			if (!animationLoopStarted) {
+			     renderer.setAnimationLoop(animateBlocker);
+			     animationLoopStarted = true;
+			}
+		} else {
+				requestAnimationFrame(animateBlocker);
+		}
+	}
     let rot = 0.002;
 
     rightScene.children[0].rotateY(rot);
